@@ -2,16 +2,18 @@ import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useNavigate } from 'react-router';
 import axios from 'axios';
 import { jwtDecode } from "jwt-decode";
+import Dropdown from 'react-bootstrap/Dropdown';
+import DropdownButton from 'react-bootstrap/DropdownButton';
 
 
-export default function DocumentViewer() {
+export default function PictureViewer() {
 
     const [ error, setError ] = useState('');
-    const [ documents, setDocuments ] = useState([]);
+    const [ pictures, setPictures ] = useState([]);
     const [ formData, setFormData ] = useState({
         title: '',
         label: '',
-        id: '',
+        pictureId: '',
         filePath: '',
         fileName: ''
     });
@@ -28,11 +30,12 @@ export default function DocumentViewer() {
 
     useLayoutEffect(() => {
         checkLogin();
+        getPictures();
     });
 
     useEffect(() => {
-        getDocuments();
-    },[documents]);
+        displayPictures();
+    },[pictures]);
 
     function checkLogin() {
         if (!localStorage.getItem('token')){
@@ -51,54 +54,29 @@ export default function DocumentViewer() {
         };
     }
 
-    const getDocuments = async () => {
+    const getPictures = async () => {
 
             try{
-                await axios.get('http://localhost:4000/api/get-documents', {
+                await axios.get('http://localhost:4000/api/get-pictures', {
                     headers: {
                         'Content-Type': 'application/json',
                         'x-access-token': localStorage.getItem('token')
                     }}
                 ).then(response => {
-                    if(response.data.documents){
-                        setDocuments(response.data.documents);
+                    if(response.data.pictures){
+                        setPictures(response.data.pictures);
                     } else if(response.error) {
                         setError(response.error);
                     } else {
-                        setError('Something went wrong with getting the documents.');
+                        setError('Something went wrong with getting the pictures.');
                     }
                 });
 
             }catch(error){
-                setError('Something went wrong with getting the documents.')
+                setError('Something went wrong with getting the pictures.')
             };
 
     };
-
-    const displayDocuments = useMemo(() => {    // *** FEEDBACK WANTED *** I don't know if I'm using this hook correctly here
-        
-        if(documents.length === 0){
-
-            return (
-                <p>No documents uploaded.</p>
-            );
-
-        }else{
-
-            return <section>test</section>,documents.map((document) => (
-
-                <section className="flex gap-4 justify-between p-2" key={document.id}>
-                    <p className="text-white w-[8rem] overflow-auto">{document.title}</p>
-                    <p className="text-white flex-2 w-[6rem] overflow-auto">{document.label}</p>
-                    <section className="flex-3 flex gap-2">
-                        <button className="border-1 p-1 bg-green-700 hover:bg-green-500" value={document.id} onClick={() => editDocument(document)}>Edit</button>
-                        <button className="border-1 p-1 bg-red-700 hover:bg-red-500" value={document.id} onClick={() => deleteDocument(document.id,document.filePath)}>Delete</button>
-                    </section>
-                </section>
-
-            ));
-        };
-    });
 
     const editDocument = (myDocument) => {
         
@@ -175,7 +153,44 @@ export default function DocumentViewer() {
         };
     };
 
-    const displayEditor = useMemo(() => {
+    function sortPictures(pictures, key, order = 'asc') {
+
+        return pictures.sort((a,b) => {
+            if(a[key] < b[key]) return
+                order === 'asc' ? -1 : 1;
+            if(a[key] > b[key]) return
+                order === 'asc' ? 1 : -1;
+            return 0;
+        });
+    };
+
+    function displayPictures() {
+        
+        if(pictures.length === 0){
+
+            return (
+                <p>No picture uploaded.</p>
+            );
+
+        }else{
+
+            return pictures.map((picture) => (
+
+                <section className="flex gap-4 justify-between p-2" key={picture.pictureId}>
+                    <img src={'http://localhost:4000' + picture.filePath} className='border-2 object-cover h-[10rem] w-[10rem]' />
+                    <p className="text-white w-[8rem] text-center">{picture.title}</p>
+                    <p className="text-white flex-2 w-[6rem] text-center">{picture.label}</p>
+                    <section className="flex-3 flex gap-2">
+                        <button className="border-1 p-1 bg-green-700 hover:bg-green-500 h-[2rem]" value={picture.id} onClick={() => editDocument(document)}>Edit</button>
+                        <button className="border-1 p-1 bg-red-700 hover:bg-red-500 h-[2rem]" value={picture.id} onClick={() => deleteDocument(document.id,document.filePath)}>Delete</button>
+                    </section>
+                </section>
+
+            ));
+        };
+    };
+
+    function displayEditor() {  // WIP
 
         return (
             <form id='editor'>
@@ -189,20 +204,26 @@ export default function DocumentViewer() {
             </form>
         )
 
-    });
+    };
 
     
     return(
         <>
-            <section id='document-viewer' className='m-4 mt-8 md:ml-20'>
+            <section id='picture-viewer' className='m-4 mt-8 md:ml-20'>
                 {editMode?
                 <section>
                     <p className="text-4xl">Editor</p>
-                    {displayEditor}
+                    {displayEditor()}
                 </section>:
                 <section>
-                    <p className="text-4xl">My Documents</p>
-                    {displayDocuments}
+                    <button type='button' onClick={() => console.log(pictures[0])}>test</button>
+                    <p className="text-4xl ml-[2rem]">My Pictures</p>
+                    <DropdownButton id="viewer-sort-by" title="Sort by:" className="cursor-pointer font-bold border-1 border-white w-[120px] rounded mb-20">
+                        <Dropdown.Item onClick={() => setPictures(sortPictures(pictures, 'id'))} className="flex cursor-pointer font-bold border-1 hover:bg-white hover:text-indigo-800 border-white w-[120px] rounded">Date</Dropdown.Item>
+                        <Dropdown.Item onClick={() => setPictures(sortPictures(pictures, 'title'))} className="flex cursor-pointer font-bold border-1 hover:bg-white hover:text-indigo-800 border-white w-[120px] rounded">Title</Dropdown.Item>
+                        <Dropdown.Item onClick={() => setPictures(sortPictures(pictures, 'label'))} className="flex cursor-pointer font-bold border-1 hover:bg-white hover:text-indigo-800 border-white w-[120px] rounded">Label</Dropdown.Item>
+                    </DropdownButton>
+                    {displayPictures()}
                 </section>
                 }
             </section>

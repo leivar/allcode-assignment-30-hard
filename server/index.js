@@ -8,6 +8,10 @@ const jwt = require('jsonwebtoken');
 const fileUpload = require('express-fileupload');
 const fs = require('fs');
 
+// Restrictions
+const notAllowedFileExtensions = [];  // Add banned file extensions here
+const maxFileSize = 0;                // Set max size of files, 0 if there is no restrictions
+
 // Password schema
 const schema = new passwordValidator();
 schema
@@ -21,7 +25,7 @@ schema
 // App declarations
 const app = express();
 app.use(express.json(), cors(), fileUpload());
-app.use('/pictures', express.static(__dirname+'/pictures'));
+app.use('/pictures', express.static(__dirname + '/pictures'));
 
 // Set the port variable
 const PORT = 4000;
@@ -33,60 +37,50 @@ const readTokenUserId = (req, res, next) => {
   
   jwt.verify(token, process.env.SECRET_KEY, (error, decoded) => {
     if(error){
-      res.send({error: error.message});
+      res.send({error: error});
       return;
     }
     else {
       userId = decoded.userId;
+      if(!userId){
+        res.send({error: 'Something went wrong verifying your user. Please log back in and try again later.'});
+        return;
+      }
       next();
     }
   });
 };
 
-// Endpoint for user login and token
-app.post('/login', async (req, res) => {
-
-  const loginData = req.body;
-
-  if(!loginData.email || !loginData.password ){
-      res.send({error: 'Email or password is not provided.'});
-      return;
-  };
-
-  try {
-      const user = await prisma.user.findUnique({
-          where: {
-              email: loginData.email,
-              password: loginData.password
-          }
-      });
-
-      if(!user){
-          res.send({error: 'Email or password is not valid.'});
-          return;
-      }
-      
-      res.send({
-          token: jwt.sign({ userId: user.id }, process.env.SECRET_KEY, { expiresIn: '1h' }), user
-      });
-  } catch(error) {
-      res.send({error: error})
-      return;
-  };
-
-});
-
-// Endpoint to upload a new document WIP
+// Endpoint to create a new photo
 app.post('/api/upload-picture', readTokenUserId, async(req, res) => {
 
   const authorId = userId;
   const file = req.files.file;
+  const fileName = file.name;
   const fileData = req.body;
   const directoryPath = __dirname+'/pictures/'+userId.toString();
+  const fileExtension = (fileName) => {       // Gets file extension
+    return '.'+fileName.substring(fileName.lastIndexOf('.')+1, fileName.length) || '.'+fileName;
+  }
 
-  const fullPath = directoryPath+'/'+fileData.title;
+  if (fileExtension(fileName) in notAllowedFileExtensions){
+    res.send({error: 'This filetype is not supported by your provider.'});
+    return;
+  }
 
-  const fileExists = await prisma.document.findFirst({
+  if (file.size > maxFileSize && maxFileSize!==0){
+    res.send({error: `Filesizes greater than ${maxFileSize} is not allowed by your provider.`});
+    return;
+  }
+
+  const fullPath = directoryPath+'/'+fileData.title+fileExtension(fileName);
+
+  if (!req.files){
+    res.send({error: 'No file uploaded.'});
+    return;
+  }
+
+  const fileExists = await prisma.picture.findFirst({
     where: {
         authorId: authorId,
         title: fileData.title
@@ -94,19 +88,9 @@ app.post('/api/upload-picture', readTokenUserId, async(req, res) => {
 });
 
   if (fileExists){
-    res.send({error: 'File with that name already exists. Please choose a new title.'});
+    res.send({error: 'Photo with that name already exists. Please choose a new title.'});
     return;
   }
-
-  if (!req.files){
-    res.send({error: 'No file uploaded.'});
-    return;
-  }
-
-
-
-
-
 
   if (!fs.existsSync(directoryPath)){       // Checks if destination folder exist and creates it if not
     fs.mkdir(directoryPath, {recursive: true}, err => {
@@ -123,17 +107,16 @@ app.post('/api/upload-picture', readTokenUserId, async(req, res) => {
       return;
     }
 
-    await prisma.document.create({
+    await prisma.picture.create({
       data: {
-        fileName: fileData.title+pdfExtension,
-        filePath: fullPath,
+        filePath: `/pictures/${userId}/${fileData.title}${fileExtension(fileName)}`,
         title: fileData.title,
         label: fileData.label,
         authorId: authorId
       }
     });
 
-    res.send({success: "PDF uploaded successfully."})
+    res.send({success: "Photo uploaded successfully."})
   });
 });
 
@@ -192,7 +175,7 @@ app.post('/register', async (req, res) => {
     return;
   }
   
-// user registration
+  // user registration
   try {
     
     await prisma.user.create({
@@ -209,6 +192,55 @@ app.post('/register', async (req, res) => {
   }catch(error) {
     res.send({ error: 'Something went wrong. Please try again later.'});
     return;
+  };
+
+});
+
+// Endpoint to get pictures
+app.get('/api/get-pictures', readTokenUserId, async(req,res) => {
+
+  const authorId = userId;
+  
+  const pictures = await prisma.picture.findMany({
+    where: {
+      authorId: authorId
+    }
+  });
+
+  res.send({ pictures });
+
+});
+
+
+// Endpoint for user login and token
+app.post('/login', async (req, res) => {
+
+  const loginData = req.body;
+
+  if(!loginData.email || !loginData.password ){
+      res.send({error: 'Email or password is not provided.'});
+      return;
+  };
+
+  try {
+      const user = await prisma.user.findUnique({
+          where: {
+              email: loginData.email,
+              password: loginData.password
+          }
+      });
+
+      if(!user){
+          res.send({error: 'Email or password is not valid.'});
+          return;
+      }
+      
+      res.send({
+          token: jwt.sign({ userId: user.userId }, process.env.SECRET_KEY, { expiresIn: '1h' }), user
+      });
+  } catch(error) {
+      res.send({error: error})
+      return;
   };
 
 });
