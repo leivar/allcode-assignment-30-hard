@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { useNavigate } from 'react-router';
 import axios from 'axios';
 import { jwtDecode } from "jwt-decode";
@@ -10,6 +10,7 @@ export default function PictureViewer() {
 
     const [ error, setError ] = useState('');
     const [ pictures, setPictures ] = useState([]);
+    const [ myList, setMyList ] = useState([]);
     const [ formData, setFormData ] = useState({
         title: '',
         label: '',
@@ -28,14 +29,42 @@ export default function PictureViewer() {
         }));
     };
 
+    const sortPictures = (pictures, key) => {
+
+        if(key === 'pictureId'){
+            return pictures.sort((a,b) => {
+                if(a[key] < b[key]) {
+                    return -1 
+                };
+                if(a[key] > b[key]) {
+                    return 1
+                };
+                return 0;
+            });    
+        } else {
+            return pictures.sort((a,b) => {
+                if(a[key].toLowerCase() < b[key].toLowerCase()) {
+                    return -1 
+                };
+                if(a[key].toLowerCase() > b[key].toLowerCase()) {
+                    return 1
+                };
+                return 0;
+            });
+        };
+    };
+
+
     useLayoutEffect(() => {
         checkLogin();
         getPictures();
     });
 
     useEffect(() => {
-        displayPictures();
-    },[pictures]);
+        if(pictures.length !== myList.length){
+            setMyList(pictures);
+        }
+    });
 
     function checkLogin() {
         if (!localStorage.getItem('token')){
@@ -54,29 +83,29 @@ export default function PictureViewer() {
         };
     }
 
-    const getPictures = async () => {
+const getPictures = async () => {
 
-            try{
-                await axios.get('http://localhost:4000/api/get-pictures', {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-access-token': localStorage.getItem('token')
-                    }}
-                ).then(response => {
-                    if(response.data.pictures){
-                        setPictures(response.data.pictures);
-                    } else if(response.error) {
-                        setError(response.error);
-                    } else {
-                        setError('Something went wrong with getting the pictures.');
-                    }
-                });
+        try{
+            await axios.get('http://localhost:4000/api/get-pictures', {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-access-token': localStorage.getItem('token')
+                }}
+            ).then(response => {
+                if(response.data.pictures){
+                    setPictures(response.data.pictures);
+                } else if(response.error) {
+                    setError(response.error);
+                } else {
+                    setError('Something went wrong with getting the pictures.');
+                }
+            });
 
-            }catch(error){
-                setError('Something went wrong with getting the pictures.')
-            };
+        }catch(error){
+            setError('Something went wrong with getting the pictures.')
+        };
 
-    };
+};
 
     const editDocument = (myDocument) => {
         
@@ -153,20 +182,9 @@ export default function PictureViewer() {
         };
     };
 
-    function sortPictures(pictures, key, order = 'asc') {
-
-        return pictures.sort((a,b) => {
-            if(a[key] < b[key]) return
-                order === 'asc' ? -1 : 1;
-            if(a[key] > b[key]) return
-                order === 'asc' ? 1 : -1;
-            return 0;
-        });
-    };
-
-    function displayPictures() {
+    const displayPictures = () => {
         
-        if(pictures.length === 0){
+        if(myList.length === 0){
 
             return (
                 <p>No picture uploaded.</p>
@@ -174,7 +192,7 @@ export default function PictureViewer() {
 
         }else{
 
-            return pictures.map((picture) => (
+            return myList.map((picture) => (
 
                 <section className="flex gap-4 justify-between p-2" key={picture.pictureId}>
                     <img src={'http://localhost:4000' + picture.filePath} className='border-2 object-cover h-[10rem] w-[10rem]' />
@@ -216,12 +234,11 @@ export default function PictureViewer() {
                     {displayEditor()}
                 </section>:
                 <section>
-                    <button type='button' onClick={() => console.log(pictures[0])}>test</button>
                     <p className="text-4xl ml-[2rem]">My Pictures</p>
                     <DropdownButton id="viewer-sort-by" title="Sort by:" className="cursor-pointer font-bold border-1 border-white w-[120px] rounded mb-20">
-                        <Dropdown.Item onClick={() => setPictures(sortPictures(pictures, 'id'))} className="flex cursor-pointer font-bold border-1 hover:bg-white hover:text-indigo-800 border-white w-[120px] rounded">Date</Dropdown.Item>
-                        <Dropdown.Item onClick={() => setPictures(sortPictures(pictures, 'title'))} className="flex cursor-pointer font-bold border-1 hover:bg-white hover:text-indigo-800 border-white w-[120px] rounded">Title</Dropdown.Item>
-                        <Dropdown.Item onClick={() => setPictures(sortPictures(pictures, 'label'))} className="flex cursor-pointer font-bold border-1 hover:bg-white hover:text-indigo-800 border-white w-[120px] rounded">Label</Dropdown.Item>
+                        <Dropdown.Item onClick={() => setMyList(sortPictures(pictures, 'pictureId'))} className="flex cursor-pointer font-bold border-1 hover:bg-white hover:text-indigo-800 border-white w-[120px] rounded">Date</Dropdown.Item>
+                        <Dropdown.Item onClick={() => setMyList(sortPictures(pictures, 'title'))} className="flex cursor-pointer font-bold border-1 hover:bg-white hover:text-indigo-800 border-white w-[120px] rounded">Title</Dropdown.Item>
+                        <Dropdown.Item onClick={() => setMyList(sortPictures(pictures, 'label'))} className="flex cursor-pointer font-bold border-1 hover:bg-white hover:text-indigo-800 border-white w-[120px] rounded">Label</Dropdown.Item>
                     </DropdownButton>
                     {displayPictures()}
                 </section>
