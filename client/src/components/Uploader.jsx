@@ -7,9 +7,18 @@ export default function Uploader() {
     const [ title, setTitle ] = useState('');
     const [ label, setLabel ] = useState('');
     const [ success, setSuccess ] = useState('');
-    const [ error, setError ] = useState('');
+    const [ error, setError ] = useState('')
+    const [ toggleUploader, setToggleUploader ] = useState(false);
     const fileSizeRestriction = 0; // Change to set a maximum size of picture
 
+    const togglePictureUploader = () => {
+        if(toggleUploader === false){
+            setToggleUploader(true);
+        } else {
+            setToggleUploader(false);
+        }
+    };
+    
     const handleFileChange = (e) => {
         
         if(e.target.files){
@@ -78,7 +87,8 @@ export default function Uploader() {
             {error?
                 <p className='bg-rose-500 rounded p-2'>{error}</p>: null    
             }
-            <h1 className='text-4xl ml-[2rem]'>Upload new picture</h1>
+            <button className='flex border-1 border-white ml-[2rem] p-1 rounded-xl hover:bg-white hover:text-indigo-800' onClick={() => togglePictureUploader()}>Upload new picture</button>
+            {toggleUploader ? 
             <form className='md:ml-[10rem] md:mt-[2rem]'>
                 <input type='file' className='cursor-pointer' name='documentFile' onChange={handleFileChange} />
                 <section id='label flex flex-row m-4'>
@@ -89,6 +99,8 @@ export default function Uploader() {
                     <button className='flex border-1 border-white m-2 p-1 rounded-xl hover:bg-white hover:text-indigo-800' type='button' onClick={() => documentValidator()}>Submit</button>
                 </section>
             </form>
+            :null
+            }
         </section>
     )
 }

@@ -245,6 +245,76 @@ app.post('/login', async (req, res) => {
 
 });
 
+// Endpoint to edit specific picture 
+app.put('/api/update-picture/:pictureId', readTokenUserId, async (req, res) => {
+
+  const pictureId = parseInt(req.params.pictureId);
+  const authorId = userId;            // fetched with readTokenUserId
+  const updateData = req.body;
+  const fixedPath = '/pictures/'+userId.toString()+'/';
+  const fileExtension = (fileName) => {       // Gets file extension
+    return '.'+fileName.substring(fileName.lastIndexOf('.')+1, fileName.length) || '.'+fileName;
+  }
+  const newFilePath = fixedPath+updateData.title+fileExtension(updateData.filePath);
+
+  try {
+    if (updateData.filePath !== newFilePath){
+      fs.renameSync(__dirname+updateData.filePath, __dirname+newFilePath); // Renames the actual file on the server
+    };
+
+    await prisma.picture.update({
+      where: {
+        pictureId: pictureId,
+        authorId: authorId
+      },
+      data: {
+        title: updateData.title,
+        label: updateData.label,
+        filePath: newFilePath
+      },
+    });
+
+    res.send({success: 'Picture updated successfully.'});
+  }catch(error){
+    res.send({error: 'Something went wrong with retrieving your document. Please try again later.'});
+    return;
+  };
+
+});
+
+// Endpoint to delete specific document
+app.delete('/api/delete-picture/:pictureId', readTokenUserId, async (req, res) => {
+
+  const pictureId = parseInt(req.params.pictureId);
+  const authorId = userId;            // fetched with readTokenUserId
+  const fullPath = req.body.filePath;
+
+  try {
+
+    fs.unlink(__dirname+fullPath, async(error) => {      // The deletion of the file
+      if(error){
+        res.send({error: error});
+        return;
+      }
+    });
+
+    await prisma.picture.delete({
+      where: {
+        pictureId: pictureId,
+        authorId: authorId
+      }
+    });
+
+    res.send({success: 'Document has been successfully removed.'});
+    return;
+    
+  }catch(error){
+    res.send({error: 'Something went wrong with deleting the document. Please try again later.'});
+    return;
+
+  };
+});
+
 // Start the server on the specified port
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
